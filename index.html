@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Survey with Excel Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .question {
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Dynamic Survey with Excel Upload</h1>
+
+    <!-- Upload Excel File -->
+    <input type="file" id="upload" accept=".xlsx" />
+    
+    <div id="questions"></div>
+
+    <!-- Clear All Answers Button -->
+    <button id="clearBtn">Clear All Answers</button>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script>
+        const answers = {};
+        let surveyData = [];
+        let currentQuestions = {};  // Tracks all rendered questions and their states
+
+        // Handle the Excel file upload
+        document.getElementById('upload').addEventListener('change', handleFile, false);
+        document.getElementById('clearBtn').addEventListener('click', clearAllAnswers);
+
+        function handleFile(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                surveyData = XLSX.utils.sheet_to_json(sheet);
+                
+                // Start by displaying the first question
+                displayQuestion(1);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Clear all answers and reset the survey
+        function clearAllAnswers() {
+            // Clear all stored answers
+            for (let id in answers) {
+                delete answers[id];
+            }
+
+            // Clear displayed questions
+            const questionContainer = document.getElementById("questions");
+            questionContainer.innerHTML = "";
+
+            // Reset currentQuestions tracker
+            currentQuestions = {};
+
+            // Start again from the first question
+            displayQuestion(1);
+        }
+
+        // Display a question based on its ID
+        function displayQuestion(id) {
+            const questionData = surveyData.find(q => q.ID == id);
+            if (!questionData) return;
+
+            // If the question is already displayed, stop further rendering
+            if (currentQuestions[id]) return;
+
+            const questionContainer = document.getElementById("questions");
+
+            const questionDiv = document.createElement("div");
+            questionDiv.classList.add("question");
+            questionDiv.id = `question-${id}`;
+            
+            // Question text
+            const questionText = document.createElement("h3");
+            questionText.textContent = questionData.Question;
+            questionDiv.appendChild(questionText);
+            
+            // Explanation paragraph
+            const explanationParagraph = document.createElement("p");
+            explanationParagraph.textContent = questionData.Explanation;
+            questionDiv.appendChild(explanationParagraph);
+
+            // Check if there are any answer options
+            let i = 1;
+            let hasAnswers = false;
+            while (questionData[`Answer${i}`]) {
+                hasAnswers = true;
+                const answer = questionData[`Answer${i}`];
+                const nextIdKey = `NextID${i}`;
+                const nextId = questionData[nextIdKey];
+                
+                // Only create radio buttons for non-empty answers
+                if (answer && nextId !== undefined) {
+                    const radioDiv = document.createElement("div");
+                    const radioButton = document.createElement("input");
+                    radioButton.type = "radio";
+                    radioButton.name = `answer-${id}`;
+                    radioButton.value = answer.trim();
+                    radioButton.id = `answer-${id}-${i}`;
+
+                    // Label
+                    const label = document.createElement("label");
+                    label.setAttribute("for", `answer-${id}-${i}`);
+                    label.textContent = answer.trim();
+
+                    // Event listener for selection
+                    radioButton.addEventListener('change', function () {
+                        handleAnswer(questionData, answer.trim(), nextId);
+                    });
+
+                    radioDiv.appendChild(radioButton);
+                    radioDiv.appendChild(label);
+                    questionDiv.appendChild(radioDiv);
+                }
+
+                i++;  // Move to the next Answer/NextID pair
+            }
+
+            if (!hasAnswers) {
+                // No answers, this is the final question
+                const finalText = document.createElement("h3");
+                finalText.textContent = "This is the final question.";
+                questionDiv.appendChild(finalText);
+            }
+
+            questionContainer.appendChild(questionDiv);
+
+            // Mark this question as rendered
+            currentQuestions[id] = true;
+        }
+
+        // Handle the answer selection and update the following questions
+        function handleAnswer(questionData, answer, nextId) {
+            // Store the selected answer
+            answers[questionData.ID] = answer;
+
+            // Remove any questions after the current question
+            removeFollowingQuestions(questionData.ID);
+
+            if (nextId && nextId !== '-') {
+                displayQuestion(nextId); // Display the next question
+            }
+        }
+
+        // Remove questions that follow the current question, to be replaced by new ones
+        function removeFollowingQuestions(currentId) {
+            for (const id in currentQuestions) {
+                if (parseInt(id) > parseInt(currentId)) {
+                    delete currentQuestions[id];  // Remove from the rendered list
+                    const questionElement = document.getElementById(`question-${id}`);
+                    if (questionElement) questionElement.remove();  // Remove from the DOM
+                }
+            }
+        }
+    </script>
+</body>
+</html>
