@@ -3,12 +3,12 @@ Overview
 This web application helps users select the best product based on their needs through a step-by-step survey. The application reads two Excel files—one for the survey questions and another for product data. User responses are matched to specific product features, and the recommended products are displayed accordingly.
 How to Use
 1. Preparing Your Files:
-  •	Question File (Survey): An Excel file containing survey questions and answer choices. The application will match the selected answer text directly to product features.
-    o	This file should contain columns for ID, Question, Explanation, and multiple Answer and NextID pairs.
-    o	You can always expand the answer choices by adding the columns following the format.
-  •	Product File: An Excel file containing product data. The columns represent different product features, and the rows represent the products. Each value in these columns must match an answer from the survey.
-    o	If a product can match multiple answers, you can enter the possible answers as a comma-separated list (e.g., 50-100,100-200). The application will consider the product as a match if any of the listed answers correspond to the user's selection.
-    o	An empty cell is considered a match to any answer.
+  1. Question File (Survey): An Excel file containing survey questions and answer choices. The application will match the selected answer text directly to product features.
+    1. This file should contain columns for ID, Question, Explanation, and multiple Answer and NextID pairs.
+    2. You can always expand the answer choices by adding the columns following the format.
+  2. Product File: An Excel file containing product data. The columns represent different product features, and the rows represent the products. Each value in these columns must match an answer from the survey.
+    1. If a product can match multiple answers, you can enter the possible answers as a comma-separated list (e.g., 50-100,100-200). The application will consider the product as a match if any of the listed answers correspond to the user's selection.
+    2. An empty cell is considered a match to any answer.
 2. Upload the Files:
   1.	Click Choose Question File to upload the survey file.
   2.	Click Choose Product File to upload the product data file.
