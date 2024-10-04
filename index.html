@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dynamic Survey with Excel Upload</title>
+    <title>GF Product Applicator Step by Step</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -23,15 +23,24 @@
         button:hover {
             background-color: #0056b3;
         }
+        #clearBtn {
+            display: none; /* Hide the Clear All Answers button initially */
+        }
     </style>
 </head>
 <body>
-    <h1>Dynamic Survey with Excel Upload</h1>
+    <h1>GF Product Applicator Step by Step</h1>
 
-    <!-- Upload Excel File -->
-    <input type="file" id="upload" accept=".xlsx" />
+    <!-- Upload Excel Files -->
+    <label for="upload-survey">Choose Question File</label>
+    <input type="file" id="upload-survey" accept=".xlsx" />
+    <br />
+    <label for="upload-product">Choose Product File</label>
+    <input type="file" id="upload-product" accept=".xlsx" />
     
     <div id="questions"></div>
+    <div id="final-answer"></div>
+    <div id="recommended-products"></div>
 
     <!-- Clear All Answers Button -->
     <button id="clearBtn">Clear All Answers</button>
@@ -40,13 +49,15 @@
     <script>
         const answers = {};
         let surveyData = [];
+        let productData = [];
         let currentQuestions = {};  // Tracks all rendered questions and their states
 
         // Handle the Excel file upload
-        document.getElementById('upload').addEventListener('change', handleFile, false);
+        document.getElementById('upload-survey').addEventListener('change', handleSurveyFile, false);
+        document.getElementById('upload-product').addEventListener('change', handleProductFile, false);
         document.getElementById('clearBtn').addEventListener('click', clearAllAnswers);
 
-        function handleFile(event) {
+        function handleSurveyFile(event) {
             const file = event.target.files[0];
             const reader = new FileReader();
             reader.onload = function(e) {
@@ -61,6 +72,18 @@
             reader.readAsArrayBuffer(file);
         }
 
+        function handleProductFile(event) {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                productData = XLSX.utils.sheet_to_json(sheet);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
         // Clear all answers and reset the survey
         function clearAllAnswers() {
             // Clear all stored answers
@@ -68,9 +91,14 @@
                 delete answers[id];
             }
 
-            // Clear displayed questions
+            // Clear displayed questions and results
             const questionContainer = document.getElementById("questions");
             questionContainer.innerHTML = "";
+            document.getElementById("final-answer").innerHTML = "";
+            document.getElementById("recommended-products").innerHTML = "";
+
+            // Hide Clear All Answers button when no answers
+            document.getElementById('clearBtn').style.display = 'none';
 
             // Reset currentQuestions tracker
             currentQuestions = {};
@@ -108,23 +136,23 @@
             let hasAnswers = false;
             while (questionData[`Answer${i}`]) {
                 hasAnswers = true;
-                const answer = questionData[`Answer${i}`];
+                let answer = String(questionData[`Answer${i}`]); // Ensure the answer is treated as a string
                 const nextIdKey = `NextID${i}`;
                 const nextId = questionData[nextIdKey];
                 
-                // Only create radio buttons for non-empty answers
-                if (answer && nextId !== undefined) {
+                // Only create radio buttons for non-empty answers and ensure the answer is a string
+                if (answer.trim() && nextId !== undefined) {
                     const radioDiv = document.createElement("div");
                     const radioButton = document.createElement("input");
                     radioButton.type = "radio";
                     radioButton.name = `answer-${id}`;
-                    radioButton.value = answer.trim();
+                    radioButton.value = answer.trim(); // Use trim safely
                     radioButton.id = `answer-${id}-${i}`;
 
                     // Label
                     const label = document.createElement("label");
                     label.setAttribute("for", `answer-${id}-${i}`);
-                    label.textContent = answer.trim();
+                    label.textContent = answer.trim(); // Use trim safely
 
                     // Event listener for selection
                     radioButton.addEventListener('change', function () {
@@ -144,24 +172,36 @@
                 const finalText = document.createElement("h3");
                 finalText.textContent = "This is the final question.";
                 questionDiv.appendChild(finalText);
+                displayFinalAnswer();
             }
 
             questionContainer.appendChild(questionDiv);
 
             // Mark this question as rendered
             currentQuestions[id] = true;
+
+            // Show Clear All Answers button now that a question is displayed
+            document.getElementById('clearBtn').style.display = 'block';
         }
 
         // Handle the answer selection and update the following questions
         function handleAnswer(questionData, answer, nextId) {
-            // Store the selected answer
-            answers[questionData.ID] = answer;
+            // Store the selected answer, ensuring it's treated as a string
+            answers[questionData.ID] = String(answer).trim(); 
+
+            // Clear final message and recommended products if present
+            document.getElementById("final-answer").innerHTML = "";
+            document.getElementById("recommended-products").innerHTML = "";
 
             // Remove any questions after the current question
             removeFollowingQuestions(questionData.ID);
 
+            // Ensure nextId is a number for correct processing
             if (nextId && nextId !== '-') {
-                displayQuestion(nextId); // Display the next question
+                const nextQuestion = surveyData.find(q => q.ID == nextId);
+                if (nextQuestion) {
+                    displayQuestion(Number(nextId)); // Display the next question
+                }
             }
         }
 
@@ -175,6 +215,39 @@
                 }
             }
         }
+
+        // Display the final answer and recommended products
+        function displayFinalAnswer() {
+            const finalAnswerDiv = document.getElementById("final-answer");
+            const recommendedProductsDiv = document.getElementById("recommended-products");
+
+            // Display final answer
+            const finalAnswerText = document.createElement("h3");
+            finalAnswerText.textContent = "Thank you for completing the survey!";
+            finalAnswerDiv.appendChild(finalAnswerText);
+
+            // Check for recommended products based on the survey answers
+            const recommendedProducts = productData.filter(product => {
+                return Object.keys(answers).every(questionId => {
+                    const answeredValue = answers[questionId];
+                    const productFeatureValue = product[questionId];
+
+                    // If product feature is empty or contains multiple options, check for match
+                    return productFeatureValue === undefined || productFeatureValue === '' || 
+                           productFeatureValue.split(',').map(option => option.trim()).includes(answeredValue);
+                });
+            });
+
+            if (recommendedProducts.length > 0) {
+                recommendedProductsDiv.innerHTML = "<h3>Recommended Products:</h3>";
+                recommendedProducts.forEach(product => {
+                    const productDiv = document.createElement("div");
+                    productDiv.textContent = product["Product"]; // Display the product name using the "Product" column
+                    recommendedProductsDiv.appendChild(productDiv);
+                });
+            } else {
+                recommendedProductsDiv.textContent = "No products match your selection.";
+            }
+        }
     </script>
 </body>
-</html>
